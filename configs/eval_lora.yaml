@@ -1,0 +1,17 @@
+# Evaluation of a fine-tuned adapter: zero-shot, because the point of
+# fine-tuning is that the demonstrations are no longer needed.
+# Pass the adapter and run name on the command line:
+#   python -m src.evaluate --config configs/eval_lora.yaml \
+#       --lora outputs/lora_r16_seed0 --name eval_lora_r16_seed0
+name: eval_lora
+model: Qwen/Qwen3-0.6B-Base
+lora: null
+max_lora_rank: 32
+split: val
+shots: 0
+val_size: 750
+max_new_tokens: 400
+temperature: 0.0
+seed: 0
+max_model_len: 2048
+gpu_memory_utilization: 0.85

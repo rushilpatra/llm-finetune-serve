@@ -1,0 +1,16 @@
+# LoRA SFT, rank 8, seed 0.
+# alpha = 2r keeps the effective LoRA scaling (alpha/r) constant across ranks,
+# so the ablation varies capacity rather than effective learning rate.
+name: lora_r8_seed0
+model: Qwen/Qwen3-0.6B-Base
+rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+learning_rate: 2.0e-4
+num_train_epochs: 2
+per_device_train_batch_size: 16
+gradient_accumulation_steps: 1
+lr_scheduler_type: cosine
+warmup_steps: 20
+max_length: 640
+seed: 0

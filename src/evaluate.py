@@ -242,6 +242,7 @@ def _main() -> None:
     parser.add_argument("--shots", type=int)
     parser.add_argument("--model")
     parser.add_argument("--lora")
+    parser.add_argument("--name", help="Override the run name, and so the results filename.")
     parser.add_argument("--limit", type=int, help="Evaluate the first N examples only.")
     parser.add_argument("--out", help="Override the results path.")
     parser.add_argument(
@@ -256,6 +257,8 @@ def _main() -> None:
         {"split": args.split, "shots": args.shots, "model": args.model, "lora": args.lora},
     )
 
+    if args.name:
+        config["name"] = args.name
     name = config["name"] + ("-dryrun" if args.dry_run else "")
     out = Path(args.out) if args.out else RESULTS_DIR / f"{name}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
