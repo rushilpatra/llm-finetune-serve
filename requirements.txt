@@ -1,0 +1,20 @@
+# Core. transformers>=4.51.0 is required — older versions raise KeyError: 'qwen3'.
+transformers>=4.51.0
+datasets>=2.19.0
+accelerate>=0.30.0
+peft>=0.11.0
+trl>=0.9.0
+pyyaml>=6.0
+numpy>=1.26.0
+
+# Evaluation + serving generation. vLLM pins its own torch build; in Colab
+# install it first and let it resolve torch, then install the rest.
+vllm>=0.6.0
+
+# Serving + benchmarking
+fastapi>=0.110.0
+uvicorn>=0.29.0
+httpx>=0.27.0
+
+# Plots for the README
+matplotlib>=3.8.0

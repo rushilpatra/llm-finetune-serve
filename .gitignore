@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+.DS_Store
+
+# Model artifacts are large and reproducible from configs + code.
+outputs/
+checkpoints/
+merged/
+*.safetensors
+*.bin
