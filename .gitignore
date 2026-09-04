@@ -10,3 +10,6 @@ checkpoints/
 merged/
 *.safetensors
 *.bin
+
+# Dry-run artifacts are plumbing checks, not results.
+results/*-dryrun.*
