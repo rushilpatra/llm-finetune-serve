@@ -129,8 +129,12 @@ def summarize(records: list[dict], config: dict, extra: dict) -> dict:
     }
 
 
-def generate(prompts: list[str], config: dict) -> list[str]:
-    """Batch generation with vLLM. Imported lazily so --dry-run works on CPU."""
+def build_engine(config: dict):
+    """Construct the vLLM engine once. Imported lazily so --dry-run works on CPU.
+
+    Building this per chunk would pay ~40s of startup twelve times over a
+    750-example run, and would tear the engine down before memory is measured.
+    """
     from vllm import LLM, SamplingParams
     from vllm.lora.request import LoRARequest
 
@@ -153,6 +157,11 @@ def generate(prompts: list[str], config: dict) -> list[str]:
     lora_request = (
         LoRARequest("adapter", 1, config["lora"]) if config["lora"] else None
     )
+    return llm, sampling, lora_request
+
+
+def generate(engine, prompts: list[str]) -> list[str]:
+    llm, sampling, lora_request = engine
     outputs = llm.generate(prompts, sampling, lora_request=lora_request)
     return [output.outputs[0].text for output in outputs]
 
@@ -185,6 +194,9 @@ def run(config: dict, limit: int | None, out: Path, dry_run: bool) -> dict:
     print(f"{len(examples)} examples, {len(done)} already done, {len(todo)} to generate")
 
     started = time.time()
+    # Nothing to do on a full resume, so do not pay engine startup for it.
+    engine = build_engine(config) if todo and not dry_run else None
+
     with out.open("a") as f:
         for i in range(0, len(todo), CHUNK_SIZE):
             chunk = todo[i : i + CHUNK_SIZE]
@@ -195,13 +207,17 @@ def run(config: dict, limit: int | None, out: Path, dry_run: bool) -> dict:
                 # is 1.0 by construction and means nothing.
                 generations = [data.format_completion(ex) for ex in chunk]
             else:
-                generations = generate(prompts, config)
+                generations = generate(engine, prompts)
             for example, generation in zip(chunk, generations):
                 record = score_one(example, generation)
                 done[example.id] = record
                 f.write(json.dumps(record) + "\n")
             f.flush()
             print(f"  {min(i + CHUNK_SIZE, len(todo))}/{len(todo)}")
+
+    # Read memory before the engine is released.
+    gpu = gpu_report()
+    del engine
 
     records = [done[ex.id] for ex in examples]
     metrics = summarize(
@@ -211,7 +227,7 @@ def run(config: dict, limit: int | None, out: Path, dry_run: bool) -> dict:
             "split": config["split"],
             "dry_run": dry_run,
             "wall_clock_s": time.time() - started,
-            **gpu_report(),
+            **gpu,
         },
     )
     metrics_path = out.with_suffix(".metrics.json")
