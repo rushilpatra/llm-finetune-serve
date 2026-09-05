@@ -316,12 +316,15 @@ def verify_weights(adapter_dir: Path, merged_dir: Path) -> dict:
     from src.merge import base_model_of, verify
 
     result = verify(adapter_dir, merged_dir, base_model_of(adapter_dir), torch_dtype())
-    print(f"weight check: max logit diff {result['max_logit_diff']:.5f}, "
-          f"argmax agreement {result['argmax_agreement']:.4f}")
-    if not result["within_tolerance"]:
+    print(
+        f"weight check: greedy identical {result['greedy_identical']}/{result['greedy_total']}, "
+        f"merged-vs-adapter mean logit diff {result['merged_vs_adapter']['mean_logit_diff']:.5f} "
+        f"(vs base {result['merged_vs_base']['mean_logit_diff']:.5f})"
+    )
+    if not result["passed"]:
         raise SystemExit(
-            "merged model does not match base+adapter; benchmarking it would "
-            "time the wrong weights"
+            "merged model does not reproduce base+adapter; benchmarking it "
+            "would time the wrong weights"
         )
     print("weight check passed\n")
     return result
