@@ -76,7 +76,12 @@ def paired_bootstrap(
     n_bootstrap: int = N_BOOTSTRAP,
     seed: int = BOOTSTRAP_SEED,
 ) -> dict:
-    """Bootstrap the difference (system - baseline) by resampling questions."""
+    """Bootstrap the difference (system - baseline) by resampling questions.
+
+    The interval covers uncertainty from *which questions* are on the exam. It
+    does not cover seed-to-seed training variation, which here is comparable in
+    size — see the per-seed rows in the report.
+    """
     n = len(baseline)
     rng = np.random.default_rng(seed)
     idx = rng.integers(0, n, size=(n_bootstrap, n))

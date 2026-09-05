@@ -82,6 +82,47 @@ def standard_error(p: float, n: int) -> float:
     return math.sqrt(p * (1.0 - p) / n)
 
 
+# Fields that change what gets generated. Two runs agreeing on these can share
+# a predictions file; two runs disagreeing on any of them cannot.
+FINGERPRINT_FIELDS = (
+    "model",
+    "lora",
+    "split",
+    "shots",
+    "val_size",
+    "max_new_tokens",
+    "temperature",
+    "seed",
+    "max_model_len",
+)
+
+
+def check_fingerprint(path: Path, config: dict) -> None:
+    """Refuse to resume a predictions file produced by a different config.
+
+    Resume matches on question id alone, so without this a changed model,
+    adapter, or shot count would silently inherit the previous run's
+    generations for every id already on disk.
+    """
+    meta_path = path.with_suffix(".meta.json")
+    fingerprint = {k: config[k] for k in FINGERPRINT_FIELDS}
+    if not meta_path.exists():
+        meta_path.write_text(json.dumps(fingerprint, indent=2) + "\n")
+        return
+    previous = json.loads(meta_path.read_text())
+    if previous != fingerprint:
+        changed = [
+            f"{k}: {previous.get(k)!r} -> {fingerprint[k]!r}"
+            for k in FINGERPRINT_FIELDS
+            if previous.get(k) != fingerprint[k]
+        ]
+        raise SystemExit(
+            f"{path} was written by a different configuration:\n  "
+            + "\n  ".join(changed)
+            + f"\nDelete {path} and {meta_path} to re-run, or pass a new --name."
+        )
+
+
 def load_existing(path: Path) -> dict[str, dict]:
     """Read predictions already on disk, dropping any truncated final line."""
     if not path.exists():
@@ -170,10 +211,12 @@ def gpu_report() -> dict:
     if not torch.cuda.is_available():
         return {"gpu": None}
     free, total = torch.cuda.mem_get_info()
+    # vLLM runs its engine in a separate process, so this process's torch
+    # allocator sees nothing. Device-wide usage is the only honest number here,
+    # and it is dominated by the KV cache vLLM preallocates up front
+    # (gpu_memory_utilization), not by what the model actually needs.
     return {
         "gpu": torch.cuda.get_device_name(0),
-        # vLLM may allocate outside this process, so report both views.
-        "peak_torch_mem_gb": torch.cuda.max_memory_allocated() / 1e9,
         "gpu_mem_used_gb": (total - free) / 1e9,
     }
 
@@ -190,6 +233,7 @@ def run(config: dict, limit: int | None, out: Path, dry_run: bool) -> dict:
     # `shots` selects how many demonstrations to show, never the split.
     prefix = data.build_fewshot_prefix(splits["fewshot"][: config["shots"]])
 
+    check_fingerprint(out, config)
     done = load_existing(out)
     todo = [ex for ex in examples if ex.id not in done]
     print(f"{len(examples)} examples, {len(done)} already done, {len(todo)} to generate")
