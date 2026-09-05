@@ -1,0 +1,24 @@
+{
+  "merged_vs_adapter": {
+    "max_logit_diff": 25.9375,
+    "mean_logit_diff": 1.197985053062439,
+    "argmax_agreement": 0.7250000238418579
+  },
+  "merged_vs_base": {
+    "max_logit_diff": 31.6875,
+    "mean_logit_diff": 3.50366473197937,
+    "argmax_agreement": 0.5964285731315613
+  },
+  "adapter_vs_base": {
+    "max_logit_diff": 29.75,
+    "mean_logit_diff": 3.045891046524048,
+    "argmax_agreement": 0.5821428298950195
+  },
+  "adapter_is_active": true,
+  "merge_applied": true,
+  "greedy_identical": 4,
+  "greedy_total": 4,
+  "sample_adapter": " The discount is $22 - $16 = $6.\n#### 6",
+  "sample_merged": " The discount is $22 - $16 = $6.\n#### 6",
+  "passed": true
+}

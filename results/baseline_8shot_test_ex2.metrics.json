@@ -1,0 +1,28 @@
+{
+  "run": "baseline_8shot_test_ex2",
+  "n": 1319,
+  "exact_match": 0.5276724791508719,
+  "exact_match_stderr": 0.013746161746940258,
+  "format_adherence": 0.9719484457922669,
+  "format_adherence_stderr": 0.004546505086557728,
+  "config": {
+    "name": "baseline_8shot_test_ex2",
+    "model": "Qwen/Qwen3-0.6B-Base",
+    "lora": null,
+    "max_lora_rank": 32,
+    "split": "test",
+    "shots": 8,
+    "fewshot_seed": 2,
+    "val_size": 750,
+    "max_new_tokens": 400,
+    "temperature": 0.0,
+    "seed": 0,
+    "max_model_len": 2048,
+    "gpu_memory_utilization": 0.85
+  },
+  "split": "test",
+  "dry_run": false,
+  "wall_clock_s": 88.90511274337769,
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "gpu_mem_used_gb": 37.7683968
+}
