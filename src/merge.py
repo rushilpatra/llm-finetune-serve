@@ -117,11 +117,20 @@ def verify(adapter_dir: Path, merged_dir: Path, base_model: str, dtype) -> dict:
     adapter_logits = _logits(load_adapter, batch)
     merged_logits = _logits(load_merged, batch)
 
+    # Left padding means the leading positions predict from pad tokens, where
+    # outputs are meaningless and differ arbitrarily between any two models.
+    # Including them made every pair look equally different — the bare base and
+    # the adapter appeared to disagree on 42% of predictions, which cannot be
+    # true of models that agree on 76% of final answers.
+    real = batch["attention_mask"].bool().cpu()
+
     def compare(a, b) -> dict:
+        diff = (a - b).abs()[real]
+        agree = (a.argmax(-1) == b.argmax(-1))[real].float()
         return {
-            "max_logit_diff": (a - b).abs().max().item(),
-            "mean_logit_diff": (a - b).abs().mean().item(),
-            "argmax_agreement": (a.argmax(-1) == b.argmax(-1)).float().mean().item(),
+            "max_logit_diff": diff.max().item(),
+            "mean_logit_diff": diff.mean().item(),
+            "argmax_agreement": agree.mean().item(),
         }
 
     vs_adapter = compare(merged_logits, adapter_logits)
