@@ -250,7 +250,7 @@ class VLLMRunner:
 
 
 def measure(
-    runner, prompts: list[str], concurrency: int, requests: int
+    runner, prompts: list[str], spare: list[str], concurrency: int, requests: int
 ) -> tuple[dict, list[dict]]:
     """One (config, concurrency) cell: warm up, then time closed-loop rounds.
 
@@ -263,9 +263,15 @@ def measure(
     batches = [prompts[i * concurrency : (i + 1) * concurrency] for i in range(rounds)]
     batches = [b for b in batches if b]
 
-    runner.run(batches[0])  # discarded warmup
-
-    prefill_s = runner.prefill(batches[0])
+    # Warm up and probe prefill on prompts the timed rounds never see. Reusing
+    # the measured prompts leaves them fully cached, so an APC-on arm reports a
+    # near-total hit rate that reflects "we already ran exactly this" rather
+    # than "the 8-shot prefix is shared" — flattering the long-prompt arm and
+    # measuring a cache-warm best case instead of a serving scenario.
+    warmup = (spare[:concurrency] or prompts[:concurrency])
+    probe = (spare[concurrency : 2 * concurrency] or prompts[:concurrency])
+    runner.run(warmup)
+    prefill_s = runner.prefill(probe)
 
     latencies, per_request, total_tokens = [], [], 0
     started = time.perf_counter()
@@ -369,7 +375,11 @@ def _main() -> None:
         model_path = args.model_override or (
             BASE_MODEL if config["model"] == "base" else args.merged
         )
-        prompts = build_prompts(requests, config["shots"])
+        # Extra prompts for warmup and the prefill probe, disjoint from the
+        # timed set so caching is measured on genuinely new questions.
+        spare_needed = 2 * max(args.concurrency)
+        all_prompts = build_prompts(requests + spare_needed, config["shots"])
+        prompts, spare = all_prompts[:requests], all_prompts[requests:]
         print(f"\n{'=' * 70}\n{config['name']}  ({model_path}, {config['shots']}-shot)\n{'=' * 70}")
 
         if config["stack"] == "hf":
@@ -385,7 +395,9 @@ def _main() -> None:
 
         try:
             for concurrency in args.concurrency:
-                row, per_request = measure(runner, prompts, concurrency, requests)
+                row, per_request = measure(
+                    runner, prompts, spare, concurrency, requests
+                )
                 for entry in per_request:
                     entry.update(config=config["name"], stack=config["stack"])
                 request_rows.extend(per_request)
