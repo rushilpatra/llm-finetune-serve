@@ -1,0 +1,8 @@
+.git/
+results/
+outputs/
+merged/
+notebooks/
+__pycache__/
+*.pyc
+.venv/

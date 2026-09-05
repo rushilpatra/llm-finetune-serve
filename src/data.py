@@ -18,8 +18,6 @@ import random
 import re
 from dataclasses import dataclass
 
-from datasets import load_dataset
-
 DATASET_NAME = "openai/gsm8k"
 DATASET_CONFIG = "main"
 
@@ -101,6 +99,11 @@ def is_well_formed(generation: str) -> bool:
 
 def load_gsm8k(split: str) -> list[Example]:
     """Load an official GSM8K split as `Example` objects with stable ids."""
+    # Imported here, not at module scope: the serving path uses this module for
+    # prompt formatting and answer extraction only, and should not require the
+    # datasets package or a dataset download to start.
+    from datasets import load_dataset
+
     rows = load_dataset(DATASET_NAME, DATASET_CONFIG, split=split)
     examples = []
     for i, row in enumerate(rows):

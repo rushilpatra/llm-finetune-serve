@@ -1,0 +1,7 @@
+# Serving-only dependencies. The GPU image is built on vllm/vllm-openai, which
+# already carries a matched torch + vLLM + transformers stack — the exact
+# version alignment that took several attempts to get right in Colab. Pinning a
+# base image that ships the stack pre-matched removes that class of failure.
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0
