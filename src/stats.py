@@ -212,15 +212,56 @@ def _report() -> None:
     print(f"\nwritten to {out}")
 
 
+def _report_test() -> None:
+    """The one-shot test comparison, for the selected config (rank 32)."""
+    baseline_path = RESULTS_DIR / "baseline_8shot_test.jsonl"
+    seeds = [RESULTS_DIR / f"eval_lora_r32_seed{s}_test.jsonl" for s in (0, 1)]
+    seeds = [p for p in seeds if p.exists()]
+    if not baseline_path.exists() or not seeds:
+        raise SystemExit("test predictions not found; run the test evaluations first")
+
+    print(f"TEST SPLIT, n={len(load_correctness(baseline_path))}")
+    print(f"Paired bootstrap, {N_BOOTSTRAP} resamples, seed {BOOTSTRAP_SEED}\n")
+
+    results = []
+    print("Exact match vs 8-shot baseline")
+    for path in seeds:
+        result = compare(baseline_path, [path], path.stem.replace("eval_lora_", ""))
+        results.append(result)
+        print("  " + _format(result))
+    if len(seeds) > 1:
+        result = compare(baseline_path, seeds, "rank 32 (mean)")
+        results.append(result)
+        print("  " + _format(result))
+
+    print("\nFormat adherence vs 8-shot baseline")
+    result = compare(baseline_path, seeds, "rank 32 (mean)", field="well_formed")
+    results.append(result)
+    print("  " + _format(result))
+
+    detail = compare(baseline_path, [seeds[0]], seeds[0].stem)
+    print(f"\nDisagreements, {seeds[0].stem} vs baseline:")
+    for key, value in detail["disagreements"].items():
+        print(f"  {key:14s} {value}")
+
+    out = RESULTS_DIR / "stats_test.json"
+    out.write_text(json.dumps(results, indent=2) + "\n")
+    print(f"\nwritten to {out}")
+
+
 def _main() -> None:
     parser = argparse.ArgumentParser(description="Paired bootstrap comparisons.")
     parser.add_argument("--report", action="store_true", help="Full comparison table.")
+    parser.add_argument("--report-test", action="store_true", help="The one-shot test comparison.")
     parser.add_argument("--baseline", help="Baseline predictions JSONL.")
     parser.add_argument("--system", nargs="+", help="System predictions JSONL(s).")
     args = parser.parse_args()
 
     if args.report:
         _report()
+        return
+    if args.report_test:
+        _report_test()
         return
     if not (args.baseline and args.system):
         parser.error("pass --report, or both --baseline and --system")
