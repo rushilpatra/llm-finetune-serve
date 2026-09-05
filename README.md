@@ -35,6 +35,14 @@ not beat prompting, and if anything underperformed it"** — not "fine-tuning is
 difference +0.0368, CI [+0.025, +0.049]. This is the one large, unambiguous
 effect, and it holds on both splits.
 
+**Is 55% a sane number?** The Qwen3 technical report lists **59.59** for
+Qwen3-0.6B-Base on GSM8K. Our 8-shot baseline reaching 55.2% under a different
+harness, prompt format and answer extractor puts us in the right neighbourhood;
+several people have opened issues reporting difficulty reproducing the
+published figure exactly, so a few points of gap is unremarkable. It is not a
+competitive score against frontier models, which sit in the 90s — but the
+absolute number is not what this project measures.
+
 ### Validation split (n = 750, used for all config selection)
 
 | System | Exact match | vs baseline | 95% CI | p |
@@ -91,6 +99,31 @@ number by 1.5 points, and the maximum of six noisy measurements is high partly
 Config selection therefore used **seed-averaged accuracy per rank**, and both
 seeds of the selected rank were evaluated on test. Selecting on single-run
 validation maximum would have produced a headline number inflated by ~12 points.
+
+---
+
+## Scope and caveats
+
+**The baseline is a control, not a target.** This project measures a *difference*
+between two adaptation methods on one model. Both arms land near 53%; on a model
+that scored 90%, both arms would land near 90% and the comparison would be the
+same comparison. Nothing in "LoRA SFT and 8-shot prompting are equivalent in
+accuracy, and fine-tuning wins on serving cost" depends on 53% being impressive.
+
+**Accuracy near 50% is where binomial variance is largest.** That is part of why
+the intervals here are as wide as they are, and part of why an exemplar-choice
+effect was large enough to overturn the original finding. A system operating at
+90% would produce noticeably tighter intervals for the same sample size, and
+would need a smaller effect to reach significance.
+
+**The conclusion is scoped to a model already competent at the task.** Fine-tuning
+did not help because the base model already had the capability, and GSM8K's terse
+reference solutions were not better reasoning than what it already produced —
+evidenced by training loss falling with rank while accuracy did not move. On a
+model that genuinely cannot do the task, SFT would very likely help a great deal.
+The finding is *"parameter-efficient fine-tuning on a benchmark's own training
+set adds little to a model that can already do the benchmark"*, not
+*"fine-tuning does not work"*.
 
 ---
 
