@@ -36,6 +36,7 @@ DEFAULTS = {
     "max_lora_rank": 32,
     "split": "val",        # val | test
     "shots": data.N_SHOTS,
+    "fewshot_seed": None,  # None = the canonical exemplars; an int = a variant
     "val_size": data.DEFAULT_VAL_SIZE,
     "max_new_tokens": 400,
     "temperature": 0.0,    # greedy: exact-match scoring should not be noisy
@@ -89,6 +90,7 @@ FINGERPRINT_FIELDS = (
     "lora",
     "split",
     "shots",
+    "fewshot_seed",
     "val_size",
     "max_new_tokens",
     "temperature",
@@ -231,7 +233,8 @@ def run(config: dict, limit: int | None, out: Path, dry_run: bool) -> dict:
     if limit:
         examples = examples[:limit]
     # `shots` selects how many demonstrations to show, never the split.
-    prefix = data.build_fewshot_prefix(splits["fewshot"][: config["shots"]])
+    exemplars = data.sample_fewshot(splits, config["fewshot_seed"])
+    prefix = data.build_fewshot_prefix(exemplars[: config["shots"]])
 
     check_fingerprint(out, config)
     done = load_existing(out)
@@ -285,6 +288,11 @@ def _main() -> None:
     parser.add_argument("--config", required=True)
     parser.add_argument("--split", choices=["val", "test"])
     parser.add_argument("--shots", type=int)
+    parser.add_argument(
+        "--fewshot-seed",
+        type=int,
+        help="Use a different set of exemplars, to measure exemplar sensitivity.",
+    )
     parser.add_argument("--model")
     parser.add_argument("--lora")
     parser.add_argument("--name", help="Override the run name, and so the results filename.")
@@ -299,7 +307,13 @@ def _main() -> None:
 
     config = load_config(
         args.config,
-        {"split": args.split, "shots": args.shots, "model": args.model, "lora": args.lora},
+        {
+            "split": args.split,
+            "shots": args.shots,
+            "model": args.model,
+            "lora": args.lora,
+            "fewshot_seed": args.fewshot_seed,
+        },
     )
 
     if args.name:

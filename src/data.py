@@ -139,6 +139,24 @@ def build_splits(val_size: int = DEFAULT_VAL_SIZE) -> dict[str, list[Example]]:
     }
 
 
+def sample_fewshot(
+    splits: dict[str, list[Example]], fewshot_seed: int | None = None
+) -> list[Example]:
+    """The exemplars to demonstrate, for measuring exemplar-choice sensitivity.
+
+    `None` returns the canonical reserved block. An integer draws a different
+    set of N_SHOTS exemplars from the training pool — which is safe because the
+    baseline never trains, and evaluation happens on val or test either way.
+    Split boundaries are untouched, so every run is still scored on the same
+    questions.
+    """
+    if fewshot_seed is None:
+        return splits["fewshot"]
+    pool = splits["train"]
+    idx = random.Random(fewshot_seed).sample(range(len(pool)), N_SHOTS)
+    return [pool[i] for i in idx]
+
+
 def format_prompt(question: str) -> str:
     """The part of an example the model is asked to continue."""
     return f"Question: {question}\nAnswer:"
