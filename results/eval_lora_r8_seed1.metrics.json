@@ -1,0 +1,27 @@
+{
+  "run": "eval_lora_r8_seed1",
+  "n": 750,
+  "exact_match": 0.6146666666666667,
+  "exact_match_stderr": 0.017770820861009038,
+  "format_adherence": 0.9986666666666667,
+  "format_adherence_stderr": 0.0013324441479504346,
+  "config": {
+    "name": "eval_lora_r8_seed1",
+    "model": "Qwen/Qwen3-0.6B-Base",
+    "lora": "outputs/lora_r8_seed1",
+    "max_lora_rank": 32,
+    "split": "val",
+    "shots": 0,
+    "val_size": 750,
+    "max_new_tokens": 400,
+    "temperature": 0.0,
+    "seed": 0,
+    "max_model_len": 2048,
+    "gpu_memory_utilization": 0.85
+  },
+  "split": "val",
+  "dry_run": false,
+  "wall_clock_s": 90.54889225959778,
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "gpu_mem_used_gb": 38.3975424
+}
