@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen3-0.6B-Base",
+  "lora": null,
+  "split": "test",
+  "shots": 8,
+  "val_size": 750,
+  "max_new_tokens": 400,
+  "temperature": 0.0,
+  "seed": 0,
+  "max_model_len": 2048
+}
