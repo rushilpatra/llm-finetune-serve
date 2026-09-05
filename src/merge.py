@@ -30,6 +30,20 @@ VERIFY_PROMPTS = 4
 LOGIT_TOLERANCE = 0.05
 
 
+def load_causal_lm(path: str, dtype):
+    """Load a causal LM across the transformers 4/5 dtype rename.
+
+    Transformers 5 takes `dtype`; 4.x takes `torch_dtype`. Colab runs 5.x, but
+    the CPU smoke path on an older local install has to work too.
+    """
+    from transformers import AutoModelForCausalLM
+
+    try:
+        return AutoModelForCausalLM.from_pretrained(path, dtype=dtype)
+    except TypeError:
+        return AutoModelForCausalLM.from_pretrained(path, torch_dtype=dtype)
+
+
 def base_model_of(adapter_dir: Path) -> str:
     config = json.loads((adapter_dir / "adapter_config.json").read_text())
     return config["base_model_name_or_path"]
@@ -38,7 +52,7 @@ def base_model_of(adapter_dir: Path) -> str:
 def verify(adapter_dir: Path, merged_dir: Path, base_model: str, dtype) -> dict:
     """Check the merged weights reproduce the adapter's outputs."""
     from peft import PeftModel
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(base_model)
     splits = data.build_splits()
@@ -47,7 +61,7 @@ def verify(adapter_dir: Path, merged_dir: Path, base_model: str, dtype) -> dict:
     if torch.cuda.is_available():
         batch = {k: v.cuda() for k, v in batch.items()}
 
-    base = AutoModelForCausalLM.from_pretrained(base_model, dtype=dtype)
+    base = load_causal_lm(base_model, dtype)
     adapter_model = PeftModel.from_pretrained(base, str(adapter_dir))
     if torch.cuda.is_available():
         adapter_model = adapter_model.cuda()
@@ -58,7 +72,7 @@ def verify(adapter_dir: Path, merged_dir: Path, base_model: str, dtype) -> dict:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    merged = AutoModelForCausalLM.from_pretrained(str(merged_dir), dtype=dtype)
+    merged = load_causal_lm(str(merged_dir), dtype)
     if torch.cuda.is_available():
         merged = merged.cuda()
     merged.eval()
@@ -94,7 +108,7 @@ def _main() -> None:
     print(f"merging {adapter_dir} into {base_model} as {dtype}")
 
     started = time.time()
-    base = AutoModelForCausalLM.from_pretrained(base_model, dtype=dtype)
+    base = load_causal_lm(base_model, dtype)
     model = PeftModel.from_pretrained(base, str(adapter_dir))
     model = model.merge_and_unload()
     out_dir.mkdir(parents=True, exist_ok=True)
