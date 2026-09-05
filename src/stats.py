@@ -28,24 +28,28 @@ N_BOOTSTRAP = 10000
 BOOTSTRAP_SEED = 0
 
 
-def load_correctness(path: Path) -> dict[str, float]:
-    """Map question id -> 1.0 if the run got it right."""
+def load_correctness(path: Path, field: str = "correct") -> dict[str, float]:
+    """Map question id -> 1.0 if the run scored on `field`.
+
+    `correct` is the primary metric (exact match on the final number);
+    `well_formed` is the secondary one (did it emit a parseable '#### answer').
+    """
     scores = {}
     with path.open() as f:
         for line in f:
             record = json.loads(line)
-            scores[record["id"]] = float(record["correct"])
+            scores[record["id"]] = float(record[field])
     return scores
 
 
-def average_over_seeds(paths: list[Path]) -> dict[str, float]:
+def average_over_seeds(paths: list[Path], field: str = "correct") -> dict[str, float]:
     """Per-example score averaged across seeds of the same config.
 
     A question both seeds get right scores 1.0, one seed 0.5, neither 0.0.
     Averaging first means the comparison is against the config's expected
     behaviour rather than against whichever seed happened to run best.
     """
-    runs = [load_correctness(p) for p in paths]
+    runs = [load_correctness(p, field) for p in paths]
     ids = set(runs[0])
     for run in runs[1:]:
         ids &= set(run)
@@ -118,15 +122,20 @@ def disagreements(baseline: np.ndarray, system: np.ndarray) -> dict:
     }
 
 
-def compare(baseline_path: Path, system_paths: list[Path], label: str) -> dict:
-    baseline = load_correctness(baseline_path)
+def compare(
+    baseline_path: Path,
+    system_paths: list[Path],
+    label: str,
+    field: str = "correct",
+) -> dict:
+    baseline = load_correctness(baseline_path, field)
     system = (
-        average_over_seeds(system_paths)
+        average_over_seeds(system_paths, field)
         if len(system_paths) > 1
-        else load_correctness(system_paths[0])
+        else load_correctness(system_paths[0], field)
     )
     a, b = align(baseline, system)
-    result = {"label": label, **paired_bootstrap(a, b)}
+    result = {"label": label, "metric": field, **paired_bootstrap(a, b)}
     if len(system_paths) == 1:
         result["disagreements"] = disagreements(a, b)
     return result
@@ -174,12 +183,29 @@ def _report() -> None:
         results.append(result)
         print("  " + _format(result))
 
+    print("\nFormat adherence (secondary metric) vs baseline")
+    for rank in ranks:
+        paths = [RESULTS_DIR / f"eval_lora_r{rank}_seed{s}.jsonl" for s in seeds]
+        paths = [p for p in paths if p.exists()]
+        if not paths:
+            continue
+        result = compare(baseline_path, paths, f"rank {rank} (mean)", field="well_formed")
+        results.append(result)
+        print("  " + _format(result))
+
     if rank_results:
         best = max(rank_results, key=lambda r: r["system_acc"])
         print(
             f"\nBest rank by seed-averaged validation accuracy: "
             f"{best['label']} at {best['system_acc']:.4f}"
         )
+        # The aggregate tie hides substantial churn: report where they differ.
+        single = RESULTS_DIR / f"eval_lora_r{best['label'].split()[1]}_seed1.jsonl"
+        if single.exists():
+            detail = compare(baseline_path, [single], single.stem)
+            print(f"\nDisagreements, {single.stem} vs baseline:")
+            for key, value in detail["disagreements"].items():
+                print(f"  {key:14s} {value}")
 
     out = RESULTS_DIR / "stats.json"
     out.write_text(json.dumps(results, indent=2) + "\n")

@@ -1,0 +1,182 @@
+[
+  {
+    "label": "r8 seed0",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.6213333333333333,
+    "difference": -0.002666666666666706,
+    "ci_low": -0.03733333333333333,
+    "ci_high": 0.033333333333333326,
+    "p_value": 0.9104,
+    "significant": false,
+    "n": 750,
+    "disagreements": {
+      "both_correct": 377,
+      "both_wrong": 193,
+      "baseline_only": 91,
+      "system_only": 89
+    }
+  },
+  {
+    "label": "r8 seed1",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.6146666666666667,
+    "difference": -0.009333333333333305,
+    "ci_low": -0.04799999999999993,
+    "ci_high": 0.029333333333333322,
+    "p_value": 0.6634,
+    "significant": false,
+    "n": 750,
+    "disagreements": {
+      "both_correct": 359,
+      "both_wrong": 180,
+      "baseline_only": 109,
+      "system_only": 102
+    }
+  },
+  {
+    "label": "r16 seed0",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.612,
+    "difference": -0.01200000000000001,
+    "ci_low": -0.04800000000000004,
+    "ci_high": 0.02533333333333332,
+    "p_value": 0.548,
+    "significant": false,
+    "n": 750,
+    "disagreements": {
+      "both_correct": 366,
+      "both_wrong": 189,
+      "baseline_only": 102,
+      "system_only": 93
+    }
+  },
+  {
+    "label": "r16 seed1",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.624,
+    "difference": 0.0,
+    "ci_low": -0.03733333333333333,
+    "ci_high": 0.03733333333333333,
+    "p_value": 1.0,
+    "significant": false,
+    "n": 750,
+    "disagreements": {
+      "both_correct": 367,
+      "both_wrong": 181,
+      "baseline_only": 101,
+      "system_only": 101
+    }
+  },
+  {
+    "label": "r32 seed0",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.62,
+    "difference": -0.0040000000000000036,
+    "ci_low": -0.04003333333333334,
+    "ci_high": 0.03200000000000003,
+    "p_value": 0.8634,
+    "significant": false,
+    "n": 750,
+    "disagreements": {
+      "both_correct": 370,
+      "both_wrong": 187,
+      "baseline_only": 98,
+      "system_only": 95
+    }
+  },
+  {
+    "label": "r32 seed1",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.6346666666666667,
+    "difference": 0.010666666666666713,
+    "ci_low": -0.02400000000000002,
+    "ci_high": 0.046666666666666634,
+    "p_value": 0.5632,
+    "significant": false,
+    "n": 750,
+    "disagreements": {
+      "both_correct": 383,
+      "both_wrong": 189,
+      "baseline_only": 85,
+      "system_only": 93
+    }
+  },
+  {
+    "label": "rank 8 (mean)",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.618,
+    "difference": -0.006000000000000005,
+    "ci_low": -0.03933333333333333,
+    "ci_high": 0.028000000000000025,
+    "p_value": 0.7488,
+    "significant": false,
+    "n": 750
+  },
+  {
+    "label": "rank 16 (mean)",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.618,
+    "difference": -0.006000000000000005,
+    "ci_low": -0.03933333333333333,
+    "ci_high": 0.028000000000000025,
+    "p_value": 0.746,
+    "significant": false,
+    "n": 750
+  },
+  {
+    "label": "rank 32 (mean)",
+    "metric": "correct",
+    "baseline_acc": 0.624,
+    "system_acc": 0.6273333333333333,
+    "difference": 0.0033333333333332993,
+    "ci_low": -0.02866666666666673,
+    "ci_high": 0.03600000000000003,
+    "p_value": 0.8496,
+    "significant": false,
+    "n": 750
+  },
+  {
+    "label": "rank 8 (mean)",
+    "metric": "well_formed",
+    "baseline_acc": 0.9666666666666667,
+    "system_acc": 0.996,
+    "difference": 0.029333333333333322,
+    "ci_low": 0.01666666666666672,
+    "ci_high": 0.04266666666666674,
+    "p_value": 0.0,
+    "significant": true,
+    "n": 750
+  },
+  {
+    "label": "rank 16 (mean)",
+    "metric": "well_formed",
+    "baseline_acc": 0.9666666666666667,
+    "system_acc": 0.9933333333333333,
+    "difference": 0.026666666666666616,
+    "ci_low": 0.014666666666666606,
+    "ci_high": 0.040000000000000036,
+    "p_value": 0.0,
+    "significant": true,
+    "n": 750
+  },
+  {
+    "label": "rank 32 (mean)",
+    "metric": "well_formed",
+    "baseline_acc": 0.9666666666666667,
+    "system_acc": 0.9953333333333333,
+    "difference": 0.028666666666666618,
+    "ci_low": 0.015333333333333421,
+    "ci_high": 0.04266666666666663,
+    "p_value": 0.0,
+    "significant": true,
+    "n": 750
+  }
+]
