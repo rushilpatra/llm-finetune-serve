@@ -116,23 +116,26 @@ def load_gsm8k(split: str) -> list[Example]:
     return examples
 
 
-def build_splits(
-    val_size: int = DEFAULT_VAL_SIZE, n_shots: int = N_SHOTS
-) -> dict[str, list[Example]]:
+def build_splits(val_size: int = DEFAULT_VAL_SIZE) -> dict[str, list[Example]]:
     """Carve the official train split into few-shot / validation / train.
 
-    The exemplars are held out from training and validation so the 8-shot
-    baseline never demonstrates an example the fine-tuned model was trained on,
-    and neither setting has seen a validation question.
+    The boundaries deliberately do NOT depend on how many exemplars a given
+    prompt actually uses. A zero-shot evaluation still reserves the same eight
+    exemplars, so every run — 8-shot baseline and zero-shot fine-tuned model
+    alike — is scored on an identical validation set, and no run trains on a
+    question another run is evaluated on.
+
+    Callers that want fewer than N_SHOTS demonstrations slice the `fewshot`
+    list; they must not change the split.
     """
     train = load_gsm8k("train")
     order = list(range(len(train)))
     random.Random(SPLIT_SEED).shuffle(order)
     shuffled = [train[i] for i in order]
     return {
-        "fewshot": shuffled[:n_shots],
-        "val": shuffled[n_shots : n_shots + val_size],
-        "train": shuffled[n_shots + val_size :],
+        "fewshot": shuffled[:N_SHOTS],
+        "val": shuffled[N_SHOTS : N_SHOTS + val_size],
+        "train": shuffled[N_SHOTS + val_size :],
     }
 
 
@@ -175,14 +178,14 @@ def _main() -> None:
     parser.add_argument("--limit", type=int, default=2, help="How many examples to print.")
     args = parser.parse_args()
 
-    splits = build_splits(val_size=args.val_size, n_shots=args.shots)
+    splits = build_splits(val_size=args.val_size)
     splits["test"] = load_gsm8k("test")
 
     print("split sizes:")
     for name, items in splits.items():
         print(f"  {name:8s} {len(items)}")
 
-    prefix = build_fewshot_prefix(splits["fewshot"])
+    prefix = build_fewshot_prefix(splits["fewshot"][: args.shots])
     print(f"\n8-shot prefix: {len(prefix)} chars\n")
 
     for example in splits[args.split][: args.limit]:

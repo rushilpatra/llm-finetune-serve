@@ -53,7 +53,6 @@ DEFAULTS = {
     "logging_steps": 20,
     # Data
     "val_size": data.DEFAULT_VAL_SIZE,
-    "shots": data.N_SHOTS,
     "seed": 0,
 }
 
@@ -79,7 +78,7 @@ def build_dataset(config: dict, limit: int | None):
     """Prompt/completion pairs. TRL masks the prompt out of the loss."""
     from datasets import Dataset
 
-    splits = data.build_splits(val_size=config["val_size"], n_shots=config["shots"])
+    splits = data.build_splits(val_size=config["val_size"])
     examples = splits["train"]
     if limit:
         examples = examples[:limit]

@@ -181,13 +181,14 @@ def gpu_report() -> dict:
 def run(config: dict, limit: int | None, out: Path, dry_run: bool) -> dict:
     set_seed(config["seed"])
 
-    splits = data.build_splits(val_size=config["val_size"], n_shots=config["shots"])
+    splits = data.build_splits(val_size=config["val_size"])
     examples = (
         data.load_gsm8k("test") if config["split"] == "test" else splits[config["split"]]
     )
     if limit:
         examples = examples[:limit]
-    prefix = data.build_fewshot_prefix(splits["fewshot"]) if config["shots"] else ""
+    # `shots` selects how many demonstrations to show, never the split.
+    prefix = data.build_fewshot_prefix(splits["fewshot"][: config["shots"]])
 
     done = load_existing(out)
     todo = [ex for ex in examples if ex.id not in done]
