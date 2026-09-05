@@ -2,12 +2,18 @@
 # come from PyPI. This image exists to be built and actually run on a laptop;
 # the GPU image is the deployment artifact.
 #
+# torch is pinned to the +cpu build. PyPI's default aarch64 wheel bundles CUDA
+# — PyTorch ships arm64 Linux builds with GPU support for Grace/GH200 — which
+# dragged 3.3 GB of cuDNN and CUDA toolkit into an image whose entire purpose
+# is not needing a GPU.
+#
 # `datasets` is here but not in requirements-serve.txt: the deployed
 # configuration is zero-shot and never touches GSM8K, but exercising the
 # container against the 8-shot baseline needs the exemplars.
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.0
 transformers>=4.51.0
-torch
+torch==2.14.0+cpu
 datasets>=2.19.0
