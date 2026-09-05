@@ -163,6 +163,10 @@ class VLLMRunner:
         self.label = f"vLLM (prefix caching {'on' if prefix_caching else 'off'})"
         self.llm = LLM(
             model=model_path,
+            # The offline LLM class disables stats by default, which suppresses
+            # both get_metrics() and per-request RequestOutput.metrics — the
+            # prefix cache hit rate and the latency distribution respectively.
+            disable_log_stats=False,
             dtype="bfloat16" if torch.cuda.is_bf16_supported() else "float16",
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
