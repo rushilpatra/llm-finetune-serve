@@ -265,11 +265,52 @@ The off/on pair isolates prefix caching specifically: the 8-shot prefix is
 byte-identical across requests, so vLLM can compute it once. Without that arm,
 any difference would be confounded with continuous batching and PagedAttention.
 
-Metrics: TTFT, p50 / p95 latency, tokens/sec, peak GPU memory, at concurrency
-1 / 8 / 32 / 64.
+Metrics: prefill latency, p50 / p95 / max latency, tokens/sec, peak GPU memory,
+at concurrency 1 / 8 / 32 / 64. Per-request latencies are written to JSONL
+alongside the summary, because summary statistics hide the shape of the
+distribution and the shape is the point — static batching should show every
+request in a round completing at the same instant, continuous batching should
+not.
 
 Whichever system the numbers justify is what gets deployed, with the reasoning
 stated — not whichever one the original plan assumed would win.
+
+### Known limitations of this benchmark
+
+Recorded before the runs, alongside the pre-registered predictions.
+
+**Generation length is unrealistic, deliberately.** Every request generates
+exactly 256 tokens with EOS ignored, while real generations here run ~63 tokens
+at the median. That is roughly 4× more decoding than production would do, and it
+is not a neutral choice: prefill is a one-time cost amortised over the decode
+steps, while the 8-shot arm pays its ~900-key attention penalty on *every*
+decode step. So this setting systematically overweights decode and underweights
+prefill — the exact axis the prefix-caching prediction sits on. It is the right
+choice for isolating the mechanism and the wrong one for describing production
+cost, so a shorter-generation check is run separately where time allows.
+
+Fixed lengths are nonetheless necessary: the fine-tuned model is trained to stop
+early, so letting each arm stop naturally would credit it with latency wins
+belonging to the model rather than the serving stack, confounding the
+prompt-length effect with an output-length effect.
+
+**p95 at n = 64 is the third-worst observation, not a stable percentile.** It is
+reported, but tables lead with p50 and max; the max is the more honest statistic
+about tail behaviour at this sample size.
+
+**Latency measurement is conservative toward vLLM.** Where the engine reports
+per-request completion times they are used; otherwise a request is charged the
+completion time of its whole round. That is exact for static batching, where
+every request genuinely waits for the slowest, and understates vLLM, which
+finishes some requests earlier. Since vLLM is the arm expected to win, whatever
+bias remains works against the conclusion rather than for it. Fixed output
+lengths also mean sequences within a round are the same length by construction,
+so the effect is small.
+
+**TTFT is a prefill-latency proxy**, measured as a separate `max_new_tokens=1`
+call rather than a streamed first token, because batched HF `generate()` cannot
+report per-sequence first-token times. One definition across both stacks was
+worth more than a more faithful measurement on only one of them.
 
 ---
 

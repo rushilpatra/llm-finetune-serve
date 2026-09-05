@@ -113,7 +113,7 @@ class HFRunner:
             batch = {k: v.cuda() for k, v in batch.items()}
         return batch
 
-    def _generate(self, prompts: list[str], max_new_tokens: int) -> int:
+    def _generate(self, prompts: list[str], max_new_tokens: int) -> int:  # noqa: D401
         batch = self._encode(prompts)
         with torch.no_grad():
             out = self.model.generate(
@@ -136,10 +136,13 @@ class HFRunner:
         self._generate(prompts, 1)
         return time.perf_counter() - started
 
-    def run(self, prompts: list[str]) -> tuple[float, int]:
+    def run(self, prompts: list[str]) -> tuple[float, int, list[float] | None]:
         started = time.perf_counter()
         tokens = self._generate(prompts, self.max_new_tokens)
-        return time.perf_counter() - started, tokens
+        elapsed = time.perf_counter() - started
+        # Static batching returns the whole batch at once, so every request in
+        # the round genuinely completed at the same instant. Nothing is lost.
+        return elapsed, tokens, None
 
     def cache_stats(self) -> dict | None:
         return None
@@ -169,23 +172,42 @@ class VLLMRunner:
         self._sampling = SamplingParams
         self.max_new_tokens = max_new_tokens
 
-    def _generate(self, prompts: list[str], max_tokens: int) -> int:
+    def _generate(self, prompts: list[str], max_tokens: int):
         # ignore_eos and no stop strings: identical work per request on both
         # stacks, so latency differences are the stack, not the model.
         params = self._sampling(temperature=0.0, max_tokens=max_tokens,
                                 ignore_eos=True)
-        outputs = self.llm.generate(prompts, params, use_tqdm=False)
-        return sum(len(o.outputs[0].token_ids) for o in outputs)
+        return self.llm.generate(prompts, params, use_tqdm=False)
+
+    @staticmethod
+    def _per_request_latencies(outputs) -> list[float] | None:
+        """Real completion times, when the engine records them.
+
+        Continuous batching finishes requests at different moments; falling back
+        to the round time would understate vLLM. If any request is missing
+        timing, return None rather than mixing two definitions.
+        """
+        latencies = []
+        for output in outputs:
+            metrics = getattr(output, "metrics", None)
+            arrival = getattr(metrics, "arrival_time", None)
+            finished = getattr(metrics, "finished_time", None)
+            if arrival is None or finished is None:
+                return None
+            latencies.append(finished - arrival)
+        return latencies or None
 
     def prefill(self, prompts: list[str]) -> float:
         started = time.perf_counter()
         self._generate(prompts, 1)
         return time.perf_counter() - started
 
-    def run(self, prompts: list[str]) -> tuple[float, int]:
+    def run(self, prompts: list[str]) -> tuple[float, int, list[float] | None]:
         started = time.perf_counter()
-        tokens = self._generate(prompts, self.max_new_tokens)
-        return time.perf_counter() - started, tokens
+        outputs = self._generate(prompts, self.max_new_tokens)
+        elapsed = time.perf_counter() - started
+        tokens = sum(len(o.outputs[0].token_ids) for o in outputs)
+        return elapsed, tokens, self._per_request_latencies(outputs)
 
     def cache_stats(self) -> dict | None:
         """Prefix cache hit rate, if the engine exposes it.
@@ -223,8 +245,16 @@ class VLLMRunner:
             torch.cuda.empty_cache()
 
 
-def measure(runner, prompts: list[str], concurrency: int, requests: int) -> dict:
-    """One (config, concurrency) cell: warm up, then time closed-loop rounds."""
+def measure(
+    runner, prompts: list[str], concurrency: int, requests: int
+) -> tuple[dict, list[dict]]:
+    """One (config, concurrency) cell: warm up, then time closed-loop rounds.
+
+    Returns the summary and the per-request rows behind it. Summary statistics
+    hide the shape of the distribution, and the shape is the point: static
+    batching should show every request in a round completing at the same
+    instant, continuous batching should not.
+    """
     rounds = max(1, math.ceil(requests / concurrency))
     batches = [prompts[i * concurrency : (i + 1) * concurrency] for i in range(rounds)]
     batches = [b for b in batches if b]
@@ -233,24 +263,44 @@ def measure(runner, prompts: list[str], concurrency: int, requests: int) -> dict
 
     prefill_s = runner.prefill(batches[0])
 
-    latencies, total_tokens, started = [], 0, time.perf_counter()
-    for batch in batches:
-        elapsed, tokens = runner.run(batch)
+    latencies, per_request, total_tokens = [], [], 0
+    started = time.perf_counter()
+    for round_index, batch in enumerate(batches):
+        elapsed, tokens, reported = runner.run(batch)
         total_tokens += tokens
-        # Every request in a round waits for the round to finish. That is exact
-        # for static batching, and conservative for vLLM, which finishes some
-        # requests earlier than the round.
-        latencies.extend([elapsed] * len(batch))
+        # Prefer the engine's own per-request times. Falling back to the round
+        # time is exact for static batching and conservative for vLLM, which
+        # finishes some requests before the round ends.
+        if reported is not None and len(reported) == len(batch):
+            round_latencies, source = reported, "per_request"
+        else:
+            round_latencies, source = [elapsed] * len(batch), "round"
+        latencies.extend(round_latencies)
+        for i, latency in enumerate(round_latencies):
+            per_request.append(
+                {
+                    "concurrency": concurrency,
+                    "round": round_index,
+                    "index": i,
+                    "latency_s": latency,
+                    "round_wall_s": elapsed,
+                    "source": source,
+                }
+            )
     wall = time.perf_counter() - started
 
     ordered = sorted(latencies)
-    return {
+    summary = {
         "concurrency": concurrency,
         "rounds": len(batches),
         "requests": len(latencies),
         "prefill_s": prefill_s,
         "latency_p50_s": statistics.median(ordered),
+        # At n=64 the p95 is the third-worst observation, not a stable
+        # percentile. Reported, but the max is the honest tail statistic here.
         "latency_p95_s": ordered[min(len(ordered) - 1, int(0.95 * len(ordered)))],
+        "latency_max_s": ordered[-1],
+        "latency_source": per_request[0]["source"] if per_request else None,
         "wall_clock_s": wall,
         "output_tokens": total_tokens,
         "output_tokens_per_s": total_tokens / wall if wall else float("nan"),
@@ -258,6 +308,7 @@ def measure(runner, prompts: list[str], concurrency: int, requests: int) -> dict
         "gpu_mem_used_gb": gpu_memory_gb(),
         "prefix_cache": runner.cache_stats(),
     }
+    return summary, per_request
 
 
 def verify_weights(adapter_dir: Path, merged_dir: Path) -> dict:
@@ -306,7 +357,7 @@ def _main() -> None:
     if not selected:
         raise SystemExit(f"no configs matched {args.configs}")
 
-    rows = []
+    rows, request_rows = [], []
     for config in selected:
         model_path = args.model_override or (
             BASE_MODEL if config["model"] == "base" else args.merged
@@ -327,7 +378,10 @@ def _main() -> None:
 
         try:
             for concurrency in args.concurrency:
-                row = measure(runner, prompts, concurrency, requests)
+                row, per_request = measure(runner, prompts, concurrency, requests)
+                for entry in per_request:
+                    entry.update(config=config["name"], stack=config["stack"])
+                request_rows.extend(per_request)
                 row.update(
                     config=config["name"],
                     stack=config["stack"],
@@ -341,7 +395,9 @@ def _main() -> None:
                 rate = cache.get("hit_rate")
                 print(
                     f"  c={concurrency:<3d} prefill {row['prefill_s']:6.3f}s  "
-                    f"p50 {row['latency_p50_s']:7.3f}s  p95 {row['latency_p95_s']:7.3f}s  "
+                    f"p50 {row['latency_p50_s']:7.3f}s  "
+                    f"max {row['latency_max_s']:7.3f}s  "
+                    f"(p95 {row['latency_p95_s']:7.3f}s)  "
                     f"{row['output_tokens_per_s']:8.1f} tok/s"
                     + (f"  cache {rate:.3f}" if rate is not None else "")
                 )
@@ -351,7 +407,12 @@ def _main() -> None:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(rows, indent=2) + "\n")
-    print(f"\nwritten to {out}")
+
+    raw = out.with_name(out.stem + "_latencies.jsonl")
+    with raw.open("w") as f:
+        for entry in request_rows:
+            f.write(json.dumps(entry) + "\n")
+    print(f"\nwritten to {out}\nper-request latencies to {raw}")
 
 
 if __name__ == "__main__":
