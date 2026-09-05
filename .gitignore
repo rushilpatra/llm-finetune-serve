@@ -4,8 +4,11 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 
-# Model artifacts are large and reproducible from configs + code.
-outputs/
+# Model artifacts are large and reproducible from configs + code — except the
+# selected adapter, which is committed so the repo is self-contained. See the
+# README: weights in git is a deliberate tradeoff, not a recommendation.
+outputs/*
+!outputs/lora_r32_seed0/
 checkpoints/
 merged/
 *.safetensors
