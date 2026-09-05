@@ -4,10 +4,17 @@
 ARG BASE_IMAGE=vllm/vllm-openai:v0.28.0
 FROM ${BASE_IMAGE}
 
+# A CPU build swaps both the base and the requirements, so the same Dockerfile
+# produces the deployment image and an image that can be run and exercised on a
+# laptop with no GPU:
+#   docker build --build-arg BASE_IMAGE=python:3.11-slim \
+#                --build-arg SERVE_REQUIREMENTS=requirements-serve-cpu.txt .
+ARG SERVE_REQUIREMENTS=requirements-serve.txt
+
 WORKDIR /app
 
-COPY requirements-serve.txt ./
-RUN pip install --no-cache-dir -r requirements-serve.txt
+COPY requirements-serve.txt requirements-serve-cpu.txt ./
+RUN pip install --no-cache-dir -r ${SERVE_REQUIREMENTS}
 
 COPY src/ ./src/
 

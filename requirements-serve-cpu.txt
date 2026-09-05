@@ -1,0 +1,8 @@
+# CPU variant: the base image carries no ML stack, so torch and transformers
+# come from PyPI. Used to build and actually run the container on a laptop; the
+# GPU image is the deployment artifact.
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.0
+transformers>=4.51.0
+torch

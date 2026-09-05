@@ -17,8 +17,10 @@ benchmark's would be reporting accuracy it does not have.
 from __future__ import annotations
 
 import os
+import re
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -35,6 +37,40 @@ MAX_MODEL_LEN = int(os.environ.get("MAX_MODEL_LEN", "2048"))
 GPU_MEMORY_UTILIZATION = float(os.environ.get("GPU_MEMORY_UTILIZATION", "0.85"))
 
 state: dict = {}
+
+# A Hugging Face repo id looks like "org/name" and nothing more.
+_HUB_ID = re.compile(r"^[\w.-]+/[\w.-]+$")
+
+
+def resolve_model_path(path: str) -> str:
+    """Fail fast on a bad mount instead of silently downloading from the Hub.
+
+    The container expects weights mounted at MODEL_PATH. If the mount is
+    missing or empty, the worst outcome is a service that quietly pulls a
+    different model from the internet and serves it as though it were ours —
+    so anything that names a filesystem location must exist and contain a
+    model, and anything else must at least look like a Hub id.
+    """
+    local = Path(path)
+    looks_like_path = path.startswith(("/", "./", "../")) or local.exists()
+    if looks_like_path:
+        if not local.exists():
+            raise RuntimeError(
+                f"MODEL_PATH={path!r} does not exist. Mount the merged model "
+                f"there, e.g. docker run -v /host/merged/lora_r32_seed0:{path}"
+            )
+        if not (local / "config.json").exists():
+            raise RuntimeError(
+                f"MODEL_PATH={path!r} exists but contains no config.json — the "
+                f"mount looks empty or points at the wrong directory."
+            )
+        return str(local)
+    if not _HUB_ID.match(path):
+        raise RuntimeError(
+            f"MODEL_PATH={path!r} is neither an existing directory nor a "
+            f"Hugging Face repo id."
+        )
+    return path
 
 
 class Question(BaseModel):
@@ -111,6 +147,7 @@ class HFBackend:
 async def lifespan(app: FastAPI):
     # Built once at startup: the benchmark showed engine construction costs
     # tens of seconds, which is not something to pay per request.
+    resolve_model_path(MODEL_PATH)  # before loading anything expensive
     state["backend"] = VLLMBackend() if BACKEND == "vllm" else HFBackend()
     # The deployed configuration is zero-shot, so there is nothing to build and
     # no reason for the container to download GSM8K at startup. Only a
